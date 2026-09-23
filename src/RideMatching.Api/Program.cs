@@ -88,9 +88,13 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // ---- Health checks ----
+// Each dependency check is bounded with a short timeout so the readiness probe
+// fails fast (Unhealthy) instead of blocking on a dependency's own connect
+// timeout when that dependency is down.
+var healthCheckTimeout = TimeSpan.FromSeconds(3);
 builder.Services.AddHealthChecks()
-    .AddSqlServer(connectionString, name: "sql-server", tags: new[] { "ready" })
-    .AddRedis(redisConnectionString, name: "redis", tags: new[] { "ready" });
+    .AddSqlServer(connectionString, name: "sql-server", tags: new[] { "ready" }, timeout: healthCheckTimeout)
+    .AddRedis(redisConnectionString, name: "redis", tags: new[] { "ready" }, timeout: healthCheckTimeout);
 
 // ---- Rate limiting (protect frequent driver location updates) ----
 builder.Services.AddRateLimiter(options =>
