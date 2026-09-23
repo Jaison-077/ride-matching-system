@@ -57,6 +57,14 @@ public sealed class DriverService
 
         await _redis.SetPresenceAsync(driverId, ct);
 
+        // If we already know where the driver is (e.g. seeded coordinates), publish
+        // it to the GEO index so they are discoverable without waiting for the first
+        // location update.
+        if (driver.Latitude is double lat && driver.Longitude is double lng)
+        {
+            await _redis.UpsertDriverLocationAsync(driverId, lat, lng, ct);
+        }
+
         _logger.LogInformation("DriverOnline {DriverId}", driverId);
         return driver;
     }

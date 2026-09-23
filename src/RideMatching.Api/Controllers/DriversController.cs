@@ -26,7 +26,24 @@ public sealed class DriversController : ControllerBase
     {
         var driver = await _drivers.CreateAsync(request.Name, ct);
         var response = DriverResponse.From(driver);
-        return CreatedAtAction(nameof(Create), new { driverId = driver.Id }, response);
+        return CreatedAtAction(nameof(Get), new { driverId = driver.Id }, response);
+    }
+
+    /// <summary>Get a driver's current state.</summary>
+    /// <response code="200">Driver found.</response>
+    /// <response code="404">Driver not found.</response>
+    [HttpGet("{driverId:guid}")]
+    [ProducesResponseType(typeof(DriverResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DriverResponse>> Get(Guid driverId, CancellationToken ct)
+    {
+        var driver = await _drivers.FindAsync(driverId, ct);
+        if (driver is null)
+        {
+            throw new Domain.DriverNotFoundException(driverId);
+        }
+
+        return Ok(DriverResponse.From(driver));
     }
 
     /// <summary>Bring a driver online so they become eligible for matching.</summary>

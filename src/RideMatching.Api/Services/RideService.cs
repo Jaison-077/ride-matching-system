@@ -102,7 +102,10 @@ public sealed class RideService
 
         _logger.LogInformation("RideCreated {RideId} Rider {RiderId}", ride.Id, ride.RiderId);
 
-        await _queue.EnqueueAsync(ride.Id, ct);
+        // The ride is already committed as Matching. Enqueue must NOT be tied to the
+        // request's CancellationToken: if the client disconnects here the ride would
+        // be persisted but never queued, stranding it in Matching forever.
+        await _queue.EnqueueAsync(ride.Id, CancellationToken.None);
         return new CreateRideResult(ride, WasExisting: false);
     }
 

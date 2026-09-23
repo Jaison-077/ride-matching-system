@@ -85,7 +85,10 @@ public sealed class MatchingService
             var claimed = await TryClaimAsync(ride, candidate.DriverId, attempt, candidate.DistanceKm, ct);
             if (claimed is not null)
             {
-                await NotifyMatchedAsync(claimed, ct);
+                // The claim is committed. Post-commit side effects (Redis cleanup +
+                // notifications) must run even if a shutdown was requested, so they
+                // are not tied to the matching CancellationToken.
+                await NotifyMatchedAsync(claimed);
                 return;
             }
         }
@@ -132,8 +135,10 @@ public sealed class MatchingService
                 return null;
             }
 
-            // Re-load the tracked ride to guard against a concurrent state change.
+            // Reload the ride from the database (not the tracked cache) so the guard
+            // genuinely observes any concurrent state change, e.g. a cancellation.
             var tracked = await _db.Rides.FirstAsync(r => r.Id == ride.Id, ct);
+            await _db.Entry(tracked).ReloadAsync(ct);
             if (tracked.Status != RideStatus.Matching)
             {
                 // Ride is no longer matchable; release the driver we just claimed.
@@ -183,9 +188,11 @@ public sealed class MatchingService
         }
     }
 
-    private async Task NotifyMatchedAsync(Ride ride, CancellationToken ct)
+    private async Task NotifyMatchedAsync(Ride ride)
     {
-        // Presence/discovery cleanup and notifications happen outside the transaction.
+        // Runs after the transaction has committed; uses CancellationToken.None so a
+        // graceful shutdown still flushes Redis cleanup and client notifications.
+        var ct = CancellationToken.None;
         if (ride.DriverId is Guid driverId)
         {
             await _redis.RemoveDriverLocationAsync(driverId, ct);
@@ -210,8 +217,9 @@ public sealed class MatchingService
 
         _logger.LogInformation("NoDriverAvailable {RideId}", ride.Id);
 
-        await _notifier.NoDriverAvailableAsync(tracked.Id, tracked.RiderId, ct);
+        // Notifications are post-commit; not tied to the matching token.
+        await _notifier.NoDriverAvailableAsync(tracked.Id, tracked.RiderId, CancellationToken.None);
         await _notifier.RideStatusChangedAsync(
-            tracked.Id, tracked.RiderId, tracked.Status.ToString(), ct);
+            tracked.Id, tracked.RiderId, tracked.Status.ToString(), CancellationToken.None);
     }
 }

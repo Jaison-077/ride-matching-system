@@ -41,7 +41,7 @@ public sealed class RedisLocationService : IRedisLocationService
                 latitude,
                 driverId.ToString("D"));
         }
-        catch (RedisException ex)
+        catch (Exception ex) when (IsRedisFailure(ex))
         {
             _logger.LogWarning(ex, "Failed to upsert Redis location for driver {DriverId}", driverId);
         }
@@ -53,7 +53,7 @@ public sealed class RedisLocationService : IRedisLocationService
         {
             await Db.GeoRemoveAsync(_options.GeoKey, driverId.ToString("D"));
         }
-        catch (RedisException ex)
+        catch (Exception ex) when (IsRedisFailure(ex))
         {
             _logger.LogWarning(ex, "Failed to remove Redis location for driver {DriverId}", driverId);
         }
@@ -84,7 +84,7 @@ public sealed class RedisLocationService : IRedisLocationService
 
             return list;
         }
-        catch (RedisException ex)
+        catch (Exception ex) when (IsRedisFailure(ex))
         {
             _logger.LogWarning(ex, "Redis GEO search failed; returning no candidates.");
             return Array.Empty<NearbyDriver>();
@@ -100,7 +100,7 @@ public sealed class RedisLocationService : IRedisLocationService
                 DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 TimeSpan.FromSeconds(_options.PresenceTtlSeconds));
         }
-        catch (RedisException ex)
+        catch (Exception ex) when (IsRedisFailure(ex))
         {
             _logger.LogWarning(ex, "Failed to set presence for driver {DriverId}", driverId);
         }
@@ -115,7 +115,7 @@ public sealed class RedisLocationService : IRedisLocationService
         {
             return await Db.KeyExistsAsync(PresenceKey(driverId));
         }
-        catch (RedisException ex)
+        catch (Exception ex) when (IsRedisFailure(ex))
         {
             _logger.LogWarning(ex, "Failed to check presence for driver {DriverId}", driverId);
             // Fail-open: SQL Server still guards the actual claim, so presence
@@ -130,9 +130,23 @@ public sealed class RedisLocationService : IRedisLocationService
         {
             await Db.KeyDeleteAsync(PresenceKey(driverId));
         }
-        catch (RedisException ex)
+        catch (Exception ex) when (IsRedisFailure(ex))
         {
             _logger.LogWarning(ex, "Failed to remove presence for driver {DriverId}", driverId);
         }
     }
+
+    /// <summary>
+    /// True for exceptions that represent a Redis availability problem we want to
+    /// treat as a best-effort no-op (Redis is an optimization). Programming errors
+    /// are not swallowed. Cancellation is rethrown by not matching here.
+    /// </summary>
+    private static bool IsRedisFailure(Exception ex) => ex switch
+    {
+        OperationCanceledException => false,
+        RedisException => true,
+        TimeoutException => true,
+        ObjectDisposedException => true,
+        _ => false
+    };
 }

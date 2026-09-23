@@ -1,8 +1,24 @@
 using System.Collections.Concurrent;
+using RideMatching.Api.Background;
 using RideMatching.Api.Hubs;
 using RideMatching.Api.Services;
 
 namespace RideMatching.Tests;
+
+/// <summary>Records enqueued ride ids without a running background worker.</summary>
+public sealed class FakeRideMatchingQueue : IRideMatchingQueue
+{
+    public ConcurrentQueue<Guid> Enqueued { get; } = new();
+
+    public ValueTask EnqueueAsync(Guid rideId, CancellationToken ct = default)
+    {
+        Enqueued.Enqueue(rideId);
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<Guid> DequeueAsync(CancellationToken ct) =>
+        Enqueued.TryDequeue(out var id) ? ValueTask.FromResult(id) : ValueTask.FromResult(Guid.Empty);
+}
 
 /// <summary>
 /// In-memory stand-in for Redis. Lets tests control which drivers are "nearby"

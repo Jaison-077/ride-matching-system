@@ -150,6 +150,25 @@ public class MatchingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task All_candidates_unavailable_marks_NoDriverAvailable_and_records_failed_attempt()
+    {
+        await using var ctx = _db.CreateContext();
+        var busy = await AddDriverAsync(ctx, DriverStatus.Busy);
+        _redis.MarkPresent(busy.Id);
+        _redis.Candidates.Add(new NearbyDriver(busy.Id, 0.2));
+
+        var ride = await AddMatchingRideAsync(ctx);
+
+        await NewService(ctx).MatchAsync(ride.Id, CancellationToken.None);
+
+        await using var verify = _db.CreateContext();
+        (await verify.Rides.FindAsync(ride.Id))!.Status.Should().Be(RideStatus.NoDriverAvailable);
+        verify.RideAssignments.Should()
+            .Contain(a => a.RideId == ride.Id && a.DriverId == busy.Id && !a.Success);
+        _notifier.NoDriverAvailable.Should().Contain(ride.Id);
+    }
+
+    [Fact]
     public async Task Ride_not_in_Matching_state_is_left_untouched()
     {
         await using var ctx = _db.CreateContext();
