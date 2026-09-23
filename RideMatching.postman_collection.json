@@ -1,0 +1,237 @@
+{
+  "info": {
+    "name": "Real-Time Ride Matching System",
+    "description": "End-to-end collection for the Ride Matching API. Run the Drivers folder top-to-bottom, then Rides, then the Concurrency Demo. IDs are captured automatically into collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "driverId", "value": "" },
+    { "key": "driver2Id", "value": "" },
+    { "key": "riderId", "value": "11111111-aaaa-bbbb-cccc-111111111111" },
+    { "key": "rideId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Drivers",
+      "item": [
+        {
+          "name": "Create Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.code === 201);",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('driverId', b.driverId);",
+                  "pm.test('status is Offline', () => pm.expect(b.status).to.eql('Offline'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/drivers", "host": ["{{baseUrl}}"], "path": ["api", "drivers"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Driver 1\"\n}" }
+          }
+        },
+        {
+          "name": "Create Driver 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.code === 201);",
+                  "pm.collectionVariables.set('driver2Id', pm.response.json().driverId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/drivers", "host": ["{{baseUrl}}"], "path": ["api", "drivers"] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Driver 2\"\n}" }
+          }
+        },
+        {
+          "name": "Driver Online",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/drivers/{{driverId}}/online",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "drivers", "{{driverId}}", "online"]
+            }
+          }
+        },
+        {
+          "name": "Driver 2 Online",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/drivers/{{driver2Id}}/online",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "drivers", "{{driver2Id}}", "online"]
+            }
+          }
+        },
+        {
+          "name": "Driver Location Update",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/drivers/{{driverId}}/location",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "drivers", "{{driverId}}", "location"]
+            },
+            "body": { "mode": "raw", "raw": "{\n  \"latitude\": 28.6139,\n  \"longitude\": 77.2090\n}" }
+          }
+        },
+        {
+          "name": "Driver 2 Location Update",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/drivers/{{driver2Id}}/location",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "drivers", "{{driver2Id}}", "location"]
+            },
+            "body": { "mode": "raw", "raw": "{\n  \"latitude\": 28.6200,\n  \"longitude\": 77.2150\n}" }
+          }
+        },
+        {
+          "name": "Driver Offline",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/drivers/{{driverId}}/offline",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "drivers", "{{driverId}}", "offline"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rides",
+      "item": [
+        {
+          "name": "Create Ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.code === 201);",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('rideId', b.rideId);",
+                  "pm.test('status is Matching', () => pm.expect(b.status).to.eql('Matching'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "demo-ride-{{$guid}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/rides", "host": ["{{baseUrl}}"], "path": ["api", "rides"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 28.6139,\n  \"pickupLongitude\": 77.2090,\n  \"destinationLatitude\": 28.5355,\n  \"destinationLongitude\": 77.3910\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.code === 200);",
+                  "const b = pm.response.json();",
+                  "console.log('Ride status:', b.status, 'Driver:', b.driver && b.driver.name);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rides/{{rideId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "rides", "{{rideId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Concurrency Demo",
+      "description": "Create two rides at the same pickup. With a single available driver only one should end Matched; the other becomes NoDriverAvailable.",
+      "item": [
+        {
+          "name": "Competing Ride A",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/rides", "host": ["{{baseUrl}}"], "path": ["api", "rides"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 28.6139,\n  \"pickupLongitude\": 77.2090,\n  \"destinationLatitude\": 28.5355,\n  \"destinationLongitude\": 77.3910\n}"
+            }
+          }
+        },
+        {
+          "name": "Competing Ride B",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/rides", "host": ["{{baseUrl}}"], "path": ["api", "rides"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riderId\": \"{{riderId}}\",\n  \"pickupLatitude\": 28.6139,\n  \"pickupLongitude\": 77.2090,\n  \"destinationLatitude\": 28.5355,\n  \"destinationLongitude\": 77.3910\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health/ready", "host": ["{{baseUrl}}"], "path": ["health", "ready"] }
+          }
+        }
+      ]
+    }
+  ]
+}

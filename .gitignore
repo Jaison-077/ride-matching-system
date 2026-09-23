@@ -1,0 +1,50 @@
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+build/
+out/
+
+# .NET / Visual Studio
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.rsuser
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Rider / VS Code
+.idea/
+.vscode/
+*.swp
+
+# Test results / coverage
+[Tt]est[Rr]esult*/
+TestResults/
+coverage*.json
+coverage*.xml
+*.trx
+*.coverage
+*.coveragexml
+
+# Local SQLite test databases
+*.db
+*.db-shm
+*.db-wal
+
+# Environment / secrets (never commit real secrets)
+.env
+*.env.local
+appsettings.*.local.json
+
+# OS files
+.DS_Store
+Thumbs.db
