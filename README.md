@@ -223,16 +223,44 @@ Prerequisites: .NET 10 SDK, Docker.
 # 1. Start infrastructure (SQL Server 2022 + Redis 7)
 docker compose up -d
 
-# 2. Restore, build, test
+# 2. Restore + build
 dotnet restore
 dotnet build
+
+# 3. Apply EF Core migrations to create/update the database
+dotnet ef database update --project src/RideMatching.Api
+
+# 4. Run the test suite
 dotnet test
 
-# 3. Run the API (applies EF migrations and seeds demo drivers on startup)
+# 5. Run the API
 dotnet run --project src/RideMatching.Api
 ```
 
-The API listens on `http://localhost:5000`. Migrations are applied automatically at startup; you do not need to run `dotnet ef database update` manually.
+The API listens on `http://localhost:5000`. As a convenience, the API also applies
+any pending migrations automatically at startup, so step 3 is optional when simply
+running the app — but it is the explicit, controlled step for the development workflow
+and for CI. Always ensure the database update succeeds before functional API testing.
+
+## Configuration
+
+All infrastructure settings come from configuration — there are **no hard-coded
+connection-string fallbacks** in `Program.cs`. Startup **fails fast** with a clear
+error if `ConnectionStrings:SqlServer` or `Redis:ConnectionString` is missing.
+
+Settings resolve through the standard ASP.NET Core configuration providers, in order
+of increasing precedence:
+
+1. `appsettings.json` (local-development values, committed)
+2. `appsettings.{Environment}.json`
+3. Environment variables (e.g. `ConnectionStrings__SqlServer`, `Redis__ConnectionString`)
+4. User secrets / a secret store
+
+The values in `appsettings.json` are **local-development values only**. Real
+deployments must supply connection strings and credentials via **environment
+variables, .NET user secrets, Azure Key Vault, or another secret store** — never by
+committing production secrets to source control. Bound option classes: `MatchingOptions`
+(`Matching` section) and `RedisOptions` (`Redis` section).
 
 ## Docker Setup
 
@@ -241,7 +269,7 @@ The API listens on `http://localhost:5000`. Migrations are applied automatically
 - `sqlserver` — `mcr.microsoft.com/mssql/server:2022-latest`, port `1433`, Developer edition, health-checked.
 - `redis` — `redis:7`, port `6379`, health-checked.
 
-Credentials are **development-only** and defined inline for a clean-clone experience; they must never be used in production. The project runs from a fresh clone with `docker compose up -d` followed by `dotnet run`.
+Credentials are **development-only** and defined inline for a clean-clone experience; they must never be used in production (see [Configuration](#configuration) for the secret-store guidance). The project runs from a fresh clone with `docker compose up -d` followed by `dotnet run`.
 
 ## Swagger
 

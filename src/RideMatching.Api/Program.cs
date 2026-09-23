@@ -18,11 +18,26 @@ builder.Services.Configure<MatchingOptions>(
 builder.Services.Configure<RedisOptions>(
     builder.Configuration.GetSection(RedisOptions.SectionName));
 
-var connectionString = builder.Configuration.GetConnectionString("SqlServer")
-    ?? "Server=localhost,1433;Database=RideMatching;User Id=sa;Password=Your_password123;TrustServerCertificate=True;";
+// Required connection settings come exclusively from configuration
+// (appsettings*.json, environment variables, user secrets, etc.). There are no
+// hard-coded fallbacks: fail fast with a clear error if anything is missing.
+var connectionString = builder.Configuration.GetConnectionString("SqlServer");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Missing required configuration 'ConnectionStrings:SqlServer'. " +
+        "Set it via appsettings.json, environment variables, or a secret store.");
+}
 
 var redisConnectionString = builder.Configuration
-    .GetSection(RedisOptions.SectionName)["ConnectionString"] ?? "localhost:6379";
+    .GetSection(RedisOptions.SectionName)
+    .GetValue<string>("ConnectionString");
+if (string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    throw new InvalidOperationException(
+        "Missing required configuration 'Redis:ConnectionString'. " +
+        "Set it via appsettings.json, environment variables, or a secret store.");
+}
 
 // ---- Persistence ----
 builder.Services.AddDbContext<AppDbContext>(options =>
