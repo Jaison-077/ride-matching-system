@@ -269,7 +269,7 @@ committing production secrets to source control. Bound option classes: `Matching
 - `sqlserver` — `mcr.microsoft.com/mssql/server:2022-latest`, port `1433`, Developer edition, health-checked.
 - `redis` — `redis:7`, port `6379`, health-checked.
 
-Credentials are **development-only** and defined inline for a clean-clone experience; they must never be used in production (see [Configuration](#configuration) for the secret-store guidance). The project runs from a fresh clone with `docker compose up -d` followed by `dotnet run`.
+Credentials are **development-only** and defined inline for a clean-clone experience; they must never be used in production (see [Configuration](#configuration) for the secret-store guidance). The SQL Server SA password defaults to a local value but can be overridden without editing the file, e.g. `MSSQL_SA_PASSWORD=<your-password> docker compose up -d` (or via a `.env` file, which is git-ignored). The project runs from a fresh clone with `docker compose up -d` followed by `dotnet run`.
 
 ## Swagger
 

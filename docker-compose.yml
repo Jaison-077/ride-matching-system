@@ -6,7 +6,9 @@ services:
     container_name: ridematch-sqlserver
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "Your_password123"
+      # Local-development password only. Override via a MSSQL_SA_PASSWORD environment
+      # variable (or a .env file / secret store) for anything beyond local dev.
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-Your_password123}"
       MSSQL_PID: "Developer"
     ports:
       - "1433:1433"
