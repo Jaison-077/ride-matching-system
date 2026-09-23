@@ -17,6 +17,13 @@ public sealed class MatchingOptions
     /// <summary>Time-to-live for a driver's Redis presence key, in seconds.</summary>
     public int PresenceTtlSeconds { get; set; } = 30;
 
+    /// <summary>
+    /// Maximum age of a driver's last heartbeat (LastSeenAt) for the driver to be
+    /// claimable. A driver whose LastSeenAt is older than this is treated as stale
+    /// and cannot be assigned, even if still marked Available in SQL.
+    /// </summary>
+    public int DriverFreshnessSeconds { get; set; } = 30;
+
     /// <summary>Redis key for the driver geospatial index.</summary>
     public string GeoKey { get; set; } = "drivers:geo";
 

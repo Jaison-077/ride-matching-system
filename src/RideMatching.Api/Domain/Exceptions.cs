@@ -25,3 +25,14 @@ public sealed class ValidationException : DomainException
 {
     public ValidationException(string message) : base(message) { }
 }
+
+/// <summary>
+/// The authenticated caller is not permitted to act on the requested resource
+/// (e.g. a driver trying to control another driver, or a rider viewing a ride
+/// that is not theirs). Maps to HTTP 403.
+/// </summary>
+public sealed class ForbiddenException : DomainException
+{
+    public ForbiddenException(string message = "You are not allowed to access this resource.")
+        : base(message) { }
+}

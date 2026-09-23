@@ -50,6 +50,7 @@ public class ConcurrencyTests : IDisposable
                 Status = DriverStatus.Available,
                 Latitude = 28.6139,
                 Longitude = 77.2090,
+                LastSeenAt = DateTime.UtcNow, // fresh so it passes the freshness filter
                 CreatedAt = DateTime.UtcNow
             };
             var rideA = NewMatchingRide();

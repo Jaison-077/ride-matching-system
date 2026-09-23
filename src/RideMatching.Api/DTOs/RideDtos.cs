@@ -1,14 +1,13 @@
-using System.ComponentModel.DataAnnotations;
 using RideMatching.Api.Domain.Entities;
 
 namespace RideMatching.Api.DTOs;
 
-/// <summary>Request to create a ride.</summary>
+/// <summary>
+/// Request to create a ride. The rider identity is taken from the authenticated
+/// token, so it is intentionally not part of the request body.
+/// </summary>
 public sealed record CreateRideRequest
 {
-    [Required]
-    public Guid RiderId { get; init; }
-
     /// <example>28.6139</example>
     public double PickupLatitude { get; init; }
 

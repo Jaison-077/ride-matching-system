@@ -104,13 +104,21 @@ public sealed class MatchingService
     private async Task<Ride?> TryClaimAsync(
         Ride ride, Guid driverId, int attempt, double distanceKm, CancellationToken ct)
     {
+        // Freshness cutoff: a driver is only claimable if their last heartbeat is
+        // recent enough. Stale drivers (no recent LastSeenAt) are excluded by the
+        // same atomic UPDATE, so freshness is enforced race-free alongside the claim.
+        var freshnessCutoff = DateTime.UtcNow.AddSeconds(-_options.DriverFreshnessSeconds);
+
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         try
         {
-            // Atomic conditional claim: Available -> Busy. The affected row count
-            // is the source of truth for who wins the race.
+            // Atomic conditional claim: Available AND fresh -> Busy. The affected row
+            // count is the source of truth for who wins the race.
             var rows = await _db.Drivers
-                .Where(d => d.Id == driverId && d.Status == DriverStatus.Available)
+                .Where(d => d.Id == driverId
+                            && d.Status == DriverStatus.Available
+                            && d.LastSeenAt != null
+                            && d.LastSeenAt >= freshnessCutoff)
                 .ExecuteUpdateAsync(
                     s => s.SetProperty(d => d.Status, DriverStatus.Busy), ct);
 

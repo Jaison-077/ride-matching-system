@@ -45,6 +45,11 @@ coverage*.xml
 *.env.local
 appsettings.*.local.json
 
+# Local development settings hold dev credentials / signing keys - never commit.
+# A committed appsettings.Development.example.json documents the required shape.
+appsettings.Development.json
+**/appsettings.Development.json
+
 # OS files
 .DS_Store
 Thumbs.db
