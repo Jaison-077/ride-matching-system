@@ -20,13 +20,17 @@ public class MatchingServiceTests : IDisposable
         {
             SearchRadiusKm = 5,
             MaxCandidates = 10,
-            PresenceTtlSeconds = 30
+            PresenceTtlSeconds = 30,
+            DriverFreshnessSeconds = 30
         });
 
     private MatchingService NewService(AppDbContext ctx) =>
         new(ctx, _redis, _notifier, Options, NullLogger<MatchingService>.Instance);
 
-    private async Task<Driver> AddDriverAsync(AppDbContext ctx, DriverStatus status)
+    private Task<Driver> AddDriverAsync(AppDbContext ctx, DriverStatus status) =>
+        AddDriverAsync(ctx, status, DateTime.UtcNow);
+
+    private async Task<Driver> AddDriverAsync(AppDbContext ctx, DriverStatus status, DateTime? lastSeenAt)
     {
         var driver = new Driver
         {
@@ -35,6 +39,7 @@ public class MatchingServiceTests : IDisposable
             Status = status,
             Latitude = 28.6139,
             Longitude = 77.2090,
+            LastSeenAt = lastSeenAt,
             CreatedAt = DateTime.UtcNow
         };
         ctx.Drivers.Add(driver);
@@ -166,6 +171,64 @@ public class MatchingServiceTests : IDisposable
         verify.RideAssignments.Should()
             .Contain(a => a.RideId == ride.Id && a.DriverId == busy.Id && !a.Success);
         _notifier.NoDriverAvailable.Should().Contain(ride.Id);
+    }
+
+    [Fact]
+    public async Task Stale_driver_cannot_be_claimed_and_falls_back_to_fresh_driver()
+    {
+        await using var ctx = _db.CreateContext();
+        // 'stale' is Available but last seen 5 minutes ago -> older than 30s freshness.
+        var stale = await AddDriverAsync(ctx, DriverStatus.Available, DateTime.UtcNow.AddMinutes(-5));
+        var fresh = await AddDriverAsync(ctx, DriverStatus.Available, DateTime.UtcNow);
+        _redis.MarkPresent(stale.Id, fresh.Id);
+        _redis.Candidates.Add(new NearbyDriver(stale.Id, 0.1));   // nearest but stale
+        _redis.Candidates.Add(new NearbyDriver(fresh.Id, 1.0));
+
+        var ride = await AddMatchingRideAsync(ctx);
+
+        await NewService(ctx).MatchAsync(ride.Id, CancellationToken.None);
+
+        await using var verify = _db.CreateContext();
+        var updated = await verify.Rides.FindAsync(ride.Id);
+        updated!.Status.Should().Be(RideStatus.Matched);
+        updated.DriverId.Should().Be(fresh.Id, "the stale driver must not be claimable");
+
+        (await verify.Drivers.FindAsync(stale.Id))!.Status.Should().Be(DriverStatus.Available);
+        (await verify.Drivers.FindAsync(fresh.Id))!.Status.Should().Be(DriverStatus.Busy);
+    }
+
+    [Fact]
+    public async Task Only_stale_driver_available_results_in_NoDriverAvailable()
+    {
+        await using var ctx = _db.CreateContext();
+        var stale = await AddDriverAsync(ctx, DriverStatus.Available, DateTime.UtcNow.AddMinutes(-5));
+        _redis.MarkPresent(stale.Id);
+        _redis.Candidates.Add(new NearbyDriver(stale.Id, 0.1));
+
+        var ride = await AddMatchingRideAsync(ctx);
+
+        await NewService(ctx).MatchAsync(ride.Id, CancellationToken.None);
+
+        await using var verify = _db.CreateContext();
+        (await verify.Rides.FindAsync(ride.Id))!.Status.Should().Be(RideStatus.NoDriverAvailable);
+        (await verify.Drivers.FindAsync(stale.Id))!.Status.Should().Be(DriverStatus.Available);
+    }
+
+    [Fact]
+    public async Task Fresh_driver_is_claimed()
+    {
+        await using var ctx = _db.CreateContext();
+        var fresh = await AddDriverAsync(ctx, DriverStatus.Available, DateTime.UtcNow);
+        _redis.MarkPresent(fresh.Id);
+        _redis.Candidates.Add(new NearbyDriver(fresh.Id, 0.1));
+
+        var ride = await AddMatchingRideAsync(ctx);
+
+        await NewService(ctx).MatchAsync(ride.Id, CancellationToken.None);
+
+        await using var verify = _db.CreateContext();
+        (await verify.Rides.FindAsync(ride.Id))!.Status.Should().Be(RideStatus.Matched);
+        (await verify.Drivers.FindAsync(fresh.Id))!.Status.Should().Be(DriverStatus.Busy);
     }
 
     [Fact]

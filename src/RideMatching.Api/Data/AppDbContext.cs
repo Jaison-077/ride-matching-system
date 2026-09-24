@@ -42,8 +42,9 @@ public class AppDbContext : DbContext
             e.HasIndex(r => r.DriverId);
             e.HasIndex(r => r.CreatedAt);
 
-            // Idempotency: a given key maps to at most one ride.
-            e.HasIndex(r => r.IdempotencyKey)
+            // Idempotency is scoped to the rider: the same key maps to at most one
+            // ride per rider, while different riders may reuse the same key value.
+            e.HasIndex(r => new { r.RiderId, r.IdempotencyKey })
                 .IsUnique()
                 .HasFilter("[IdempotencyKey] IS NOT NULL");
 

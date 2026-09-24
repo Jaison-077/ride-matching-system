@@ -52,15 +52,17 @@ public sealed class RideService
             throw new ValidationException("Invalid destination coordinates.");
         }
 
-        // Idempotency: replay the previously created ride for a repeated key.
+        // Idempotency is scoped to the authenticated rider: same rider + same key
+        // returns the same ride; different riders may reuse the same key value.
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
             var existing = await _db.Rides.AsNoTracking()
-                .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, ct);
+                .FirstOrDefaultAsync(r => r.RiderId == riderId && r.IdempotencyKey == idempotencyKey, ct);
             if (existing is not null)
             {
                 _logger.LogInformation(
-                    "Idempotent ride replay {RideId} for key {Key}", existing.Id, idempotencyKey);
+                    "Idempotent ride replay {RideId} for rider {RiderId} key {Key}",
+                    existing.Id, riderId, idempotencyKey);
                 return new CreateRideResult(existing, WasExisting: true);
             }
         }
@@ -89,10 +91,11 @@ public sealed class RideService
         }
         catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
-            // A concurrent request with the same key won the unique index race.
+            // A concurrent request from the same rider with the same key won the
+            // (RiderId, IdempotencyKey) unique-index race; return that ride.
             _db.Entry(ride).State = EntityState.Detached;
             var existing = await _db.Rides.AsNoTracking()
-                .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, ct);
+                .FirstOrDefaultAsync(r => r.RiderId == riderId && r.IdempotencyKey == idempotencyKey, ct);
             if (existing is not null)
             {
                 return new CreateRideResult(existing, WasExisting: true);

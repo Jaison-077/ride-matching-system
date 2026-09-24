@@ -49,7 +49,7 @@ public class RideServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Repeated_idempotency_key_returns_same_ride_and_enqueues_once()
+    public async Task Same_rider_same_key_returns_same_ride_and_enqueues_once()
     {
         var rider = Guid.NewGuid();
         const string key = "idem-123";
@@ -63,6 +63,43 @@ public class RideServiceTests : IDisposable
 
         // Only the first creation should have enqueued work.
         _queue.Enqueued.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Different_riders_same_key_create_different_rides()
+    {
+        const string key = "shared-key";
+        var riderA = Guid.NewGuid();
+        var riderB = Guid.NewGuid();
+
+        var a = await NewService().CreateAsync(riderA, 28.61, 77.20, 28.53, 77.39, key, CancellationToken.None);
+        var b = await NewService().CreateAsync(riderB, 28.61, 77.20, 28.53, 77.39, key, CancellationToken.None);
+
+        a.WasExisting.Should().BeFalse();
+        b.WasExisting.Should().BeFalse("idempotency is scoped per rider, so a different rider gets a new ride");
+        b.Ride.Id.Should().NotBe(a.Ride.Id);
+        b.Ride.RiderId.Should().Be(riderB);
+    }
+
+    [Fact]
+    public async Task Concurrent_same_rider_same_key_creates_one_ride()
+    {
+        var rider = Guid.NewGuid();
+        const string key = "concurrent-key";
+
+        // Fire several creations concurrently, each with its own context/service.
+        var tasks = Enumerable.Range(0, 6).Select(_ =>
+            new RideService(_db.CreateContext(), _queue, NullLogger<RideService>.Instance)
+                .CreateAsync(rider, 28.61, 77.20, 28.53, 77.39, key, CancellationToken.None));
+
+        var results = await Task.WhenAll(tasks);
+
+        // Exactly one distinct ride id must result.
+        results.Select(r => r.Ride.Id).Distinct().Should().HaveCount(1);
+
+        await using var verify = _db.CreateContext();
+        var count = verify.Rides.Count(r => r.RiderId == rider && r.IdempotencyKey == key);
+        count.Should().Be(1);
     }
 
     public void Dispose() => _db.Dispose();

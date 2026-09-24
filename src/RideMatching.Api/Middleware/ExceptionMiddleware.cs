@@ -39,6 +39,8 @@ public sealed class ExceptionMiddleware
             RideNotFoundException => (StatusCodes.Status404NotFound, "Ride not found", ex.Message),
             InvalidRideStateTransitionException => (StatusCodes.Status409Conflict, "Invalid ride state transition", ex.Message),
             ValidationException => (StatusCodes.Status400BadRequest, "Validation failed", ex.Message),
+            ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden", ex.Message),
+            UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized", "Authentication is required or the token is invalid."),
             OperationCanceledException => (499, "Request cancelled", "The request was cancelled."),
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred", "An unexpected error occurred while processing the request.")
         };
